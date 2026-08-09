@@ -1,7 +1,7 @@
 use std::fmt;
 #[derive(Debug)]
 pub enum DbError{
-    Io(std::io::error),
+    Io(std::io::Error),
     SyntaxError(String),
     TableNotFound(String),
     TableAlreadyExists(String),
@@ -17,8 +17,8 @@ pub enum DbError{
     DuplicateKey(String),
     CorruptData(String),
     RowTooLarge{
-        row_size: uint,
-        page_size: uint,
+        row_size: usize,
+        page_size: usize,
     },
     PageError(String),
     InvalidPageId(u32),
@@ -29,9 +29,9 @@ pub enum DbError{
 pub type Result<T> = std::result::Result<T,DbError>;
 impl fmt::Display for DbError{
     fn fmt(&self, f: &mut fmt::Formatter<'_>)->fmt::Result{
-        match(&self){
+        match self{
             DbError::Io(error)=>{
-                write!(f, "I/O Error: {}",error);
+                write!(f, "I/O Error: {}",error)
             }
             DbError::SyntaxError(message) => {
                 write!(f, "SQL syntax error: {}", message)

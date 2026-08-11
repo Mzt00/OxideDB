@@ -23,7 +23,7 @@ pub enum DbError{
     PageError(String),
     InvalidPageId(u32),
     CatalogError(u32),
-    UnsupportedString(String), //for features which are not available yet
+    Unsupported(String), //for features which are not available yet
 }
 
 pub type Result<T> = std::result::Result<T,DbError>;

@@ -115,13 +115,13 @@ impl Pager{
     pub fn set_root_page_id(&mut self, page_id: PageId,)->Result{
         slef.validate_data_page_id(page_id)?;
         self.header.root_page_id = page_id
-        self.write_header{}
+        self.write_header()
     }
     pub fn page_count(&self)->PageId{
         self.header.page_count
     }
     pub fn allocate_page(&mut self)->Result<PageId>{
-        if self.header,page.count == INVALID_PAGE_ID{
+        if self.header.page_count == INVALID_PAGE_ID{
             return Err(DbError::PageError("Page limit has been reached".to_string()));
         }
         let page_id = self.header.page_count;

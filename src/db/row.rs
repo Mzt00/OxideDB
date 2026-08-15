@@ -6,7 +6,7 @@ use super::value::{DataType,Value};
 #[derive(Debug,Clone,PartialEq)]
 pub struct Row{
 
-    values: vec<Value>,
+    values: Vec<Value>,
 }
 
 impl Row{
@@ -14,7 +14,7 @@ impl Row{
         return Self{values}
     }
 
-    pub fn values(&self)-> &[Values]{ //doesnt transfer ownership. read only
+    pub fn values(&self)-> &[Value]{ //doesnt transfer ownership. read only
         &self.values
     }
     pub fn get(&self,index: usize)->Option<&Value>{
@@ -51,7 +51,7 @@ impl Row{
     //boolean: 1 byte null+ 1 byte bool
     //float:1 byte null + 8 bytes f64
     //text:1 null+4 byte length +N bytes text
-    pub fn encode(&self,schema:&schema)->Result<Vec<u8>>{
+    pub fn encode(&self,schema:&Schema)->Result<Vec<u8>>{
         self.validate(schema)?;
         let mut bytes = Vec::new();
         for (column, value) in schema.columns().iter().zip(self.values.iter()){
@@ -118,7 +118,7 @@ impl Row{
             }
             let value = match column.data_type(){
                 DataType::Integer=>{
-                    let data = raed_bytes{bytes, &mut position, 8}?;
+                    let data = read_bytes(bytes, &mut position, 8)?;
 
                     let array: [u8;8]= data.try_into().map_err(|_|{DbError::CorruptData("Invalid Integer data".to_string(),)})?;
                     Value::Integer(i64::from_le_bytes(array))
@@ -148,7 +148,7 @@ impl Row{
                     }
                 }
                 DataType::Text=>{
-                    let length_bytes = read_bytes(bytes,&mut, position,4)?;
+                    let length_bytes = read_bytes(bytes,&mut position,4)?;
                     let length_array: [u8;4] = length_bytes.try_into().map_err(|_|{DbError::CorruptData("Invalid text length".to_string(),)})?;
 
                     let length = u32::from_le_bytes(length_array) as usize;
@@ -163,15 +163,15 @@ impl Row{
             values.push(value);
         }
         if position!= bytes.len(){
-            return Err(DbError::CorruptedData("Corrupted data detected (trailing bytes)".to_string(),));
+            return Err(DbError::CorruptData("Corrupted data detected (trailing bytes)".to_string(),));
         }
         let row = Self {values};
         row.validate(schema)?;
 
         Ok(row)
     }
-
-    fn read_bytes<'a>(bytes: &'a [u8],position: &mut usize,length: usize,) -> Result<&'a [u8]> {
+}
+fn read_bytes<'a>(bytes: &'a [u8],position: &mut usize,length: usize,) -> Result<&'a [u8]> {
     let end = position.checked_add(length).ok_or_else(|| {
         DbError::CorruptData("Invalid byte length".to_string(),)})?;
 
@@ -184,5 +184,4 @@ impl Row{
     *position = end;
 
     Ok(data)
-}
 }

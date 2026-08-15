@@ -38,7 +38,7 @@ impl FileHeader{
         let mut page = [0u8; PAGE_SIZE];
         page[0..8].copy_from_slice(FILE_EXT);
         page[8..12].copy_from_slice(&FORMAT_VERSION.to_le_bytes(),);
-        page[12..16].copy_from_slice((PAGE_SIZE as u32).to_le_bytes(),);
+        page[12..16].copy_from_slice(&(PAGE_SIZE as u32).to_le_bytes(),);
         page[16..20].copy_from_slice(&self.root_page_id.to_le_bytes(),);
         page[20..24].copy_from_slice(&self.page_count.to_le_bytes(),);
         return page
@@ -110,11 +110,11 @@ impl Pager{
     }
 
     pub fn root_page_id(&self)->PageId{
-        self.header.root_pager_id
+        self.header.root_page_id
     }
-    pub fn set_root_page_id(&mut self, page_id: PageId,)->Result{
-        slef.validate_data_page_id(page_id)?;
-        self.header.root_page_id = page_id
+    pub fn set_root_page_id(&mut self, page_id: PageId,)->Result<()>{
+        self.validate_data_page_id(page_id)?;
+        self.header.root_page_id = page_id;
         self.write_header()
     }
     pub fn page_count(&self)->PageId{

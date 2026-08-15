@@ -87,7 +87,7 @@ impl Pager{
     }
 
     pub fn open(path:&Path)-> Result<Self>{
-        let mut file = OpenOptions::new().read(true).write(true).create_new(true).open(path)?;
+        let mut file = OpenOptions::new().read(true).write(true).open(path)?;
         let file_length = file.metadata()?.len();
         if file_length < PAGE_SIZE as u64{
             return Err(DbError::PageError("Table file cannot contain a header".to_string()));

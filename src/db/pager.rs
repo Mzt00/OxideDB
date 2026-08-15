@@ -65,6 +65,134 @@ impl FileHeader{
     
 }
 
+pub struct Pager{
+    file: File,
+    header: FileHeader,
+}
+
+impl Pager{
+    pub fn create(path: &Path)->Result<Self>{
+        let file = OpenOptions::new().read(true).write(true).create_new(true).open(path)?;
+        let header = FileHeader::new();
+        let mut pager = Self{
+            file,
+            header,
+        };
+        pager.write_header()?;
+        let empty_root = [0u8;PAGE_SIZE];
+        pager.file.seek(SeekFrom::Start(Self::page_offset(1)))?;
+        pager.file.write_all(&empty_root)?;
+        pager.flush()?;
+        Ok(pager)
+    }
+
+    pub fn open(path:&Path)-> Result<Self>{
+        let mut file = OpenOptions::new().read(true).write(true).create_new(true).open(path)?;
+        let file_length = file.metadata()?.len();
+        if file_length < PAGE_SIZE as u64{
+            return Err(DbError::PageError("Table file cannot contain a header".to_string()));
+        }
+        //not using slotting initial version. will be added in later versions
+        //every table will have fixed sized pages in the current one
+        let mut header_page= [0u8;PAGE_SIZE];
+        file.seek(SeekFrom::Start(0))?;
+        file.read_exact(&mut header_page)?;
+        let header = FileHeader::decode(&header_page)?;
+        if header.root_page_id== 0 || header.root_page_id>=header.page_count{
+            return Err(DbError::PageError("Invalid root page".to_string()));
+        }
+        let expected_length =
+            u64::from(header.page_count) * PAGE_SIZE as u64;
+        if file_length != expected_length {
+            return Err(DbError::PageError(format!("Page coun Mismatch: expected {} bytes got {} bytes",expected_length,file_length)));
+        }
+        Ok(Self {file,header,})
+    }
+
+    pub fn root_page_id(&self)->PageId{
+        self.header.root_pager_id
+    }
+    pub fn set_root_page_id(&mut self, page_id: PageId,)->Result{
+        slef.validate_data_page_id(page_id)?;
+        self.header.root_page_id = page_id
+        self.write_header{}
+    }
+    pub fn page_count(&self)->PageId{
+        self.header.page_count
+    }
+    pub fn allocate_page(&mut self)->Result<PageId>{
+        if self.header,page.count == INVALID_PAGE_ID{
+            return Err(DbError::PageError("Page limit has been reached".to_string()));
+        }
+        let page_id = self.header.page_count;
+        let empty_page = [0u8; PAGE_SIZE];
+        self.file.seek(SeekFrom::Start(Self::page_offset(page_id),))?;
+        self.file.write_all(&empty_page)?;
+        self.header.page_count += 1;
+        self.write_header()?;
+        Ok(page_id)
+    }
+    pub fn read_page(
+        &mut self,
+        page_id: PageId,
+    ) -> Result<[u8; PAGE_SIZE]> {
+        self.validate_data_page_id(page_id)?;
+
+        let mut page = [0u8; PAGE_SIZE];
+
+        self.file.seek(SeekFrom::Start(
+            Self::page_offset(page_id),
+        ))?;
+
+        self.file.read_exact(&mut page)?;
+
+        Ok(page)
+    }
+
+    pub fn write_page(&mut self,page_id: PageId,page: &[u8; PAGE_SIZE],) -> Result<()> {
+        self.validate_data_page_id(page_id)?;
+
+        self.file.seek(SeekFrom::Start(Self::page_offset(page_id),))?;
+        self.file.write_all(page)?;
+        Ok(())
+    }
+    pub fn flush(&mut self) -> Result<()> {
+        self.file.flush()?;
+        Ok(())
+    }
+    pub fn sync(&mut self) -> Result<()> {
+        self.file.sync_all()?;
+        Ok(())
+    }
+
+    fn write_header(&mut self) -> Result<()> {
+        let page = self.header.encode();
+        self.file.seek(SeekFrom::Start(0))?;
+        self.file.write_all(&page)?;
+
+        Ok(())
+    }
+
+    fn validate_data_page_id(&self,page_id: PageId,) -> Result<()> {
+        if page_id == 0 || page_id >= self.header.page_count
+        {
+            return Err(DbError::InvalidPageId(page_id));
+        }
+
+        Ok(())
+    }
+
+    fn page_offset(page_id: PageId) -> u64 {
+        u64::from(page_id) * PAGE_SIZE as u64
+    }
+}
+
+fn read_u32(page: &[u8; PAGE_SIZE],offset: usize,) -> u32 {
+    let mut bytes = [0u8; 4];
+    bytes.copy_from_slice(&page[offset..offset + 4],);
+    u32::from_le_bytes(bytes)
+}
+
 
 
 

@@ -173,7 +173,7 @@ impl Pager{
         Ok(())
     }
 
-    fn validate_data_page_id(&self,page_id: PageId,) -> Result<()> {
+    pub(super) fn validate_data_page_id(&self,page_id: PageId,) -> Result<()> {
         if page_id == 0 || page_id >= self.header.page_count
         {
             return Err(DbError::InvalidPageId(page_id));

@@ -6,3 +6,4 @@ pub mod pager;
 pub mod buffer_pool;
 pub(crate) mod b_tree;
 pub mod table;
+pub mod database;

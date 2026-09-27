@@ -12,7 +12,7 @@ pub type PageId = u32;
 pub const INVALID_PAGE_ID: PageId = u32::MAX;
 const FILE_EXT: &[u8;8] = b"OXIDEDB\0";
 const HEADER_SIZE: usize = 28;
-
+const FORMAT_VERSION: u32 = 1;
 #[derive(Debug,Clone,PartialEq,Eq)]
 
 struct FileHeader{

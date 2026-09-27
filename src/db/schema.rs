@@ -153,4 +153,80 @@ impl Schema{
         }
         Ok(())
     }
+
+    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        write_string(&mut bytes, &self.table_name)?;
+        let count = u16::try_from(self.columns.len())
+            .map_err(|_| DbError::InvalidSchema("too many columns".into()))?;
+        bytes.extend_from_slice(&count.to_le_bytes());
+        for column in &self.columns {
+            write_string(&mut bytes, &column.name)?;
+            bytes.push(match column.data_type {
+                DataType::Integer => 0,
+                DataType::Text => 1,
+                DataType::Float => 2,
+                DataType::Boolean => 3,
+            });
+            bytes.push(u8::from(column.nullable) | (u8::from(column.primary_key) << 1));
+        }
+        Ok(bytes)
+    }
+
+    pub(crate) fn decode(mut bytes: &[u8]) -> Result<Self> {
+        let table_name = read_string(&mut bytes)?;
+        let count = read_u16(&mut bytes)?;
+        let mut columns = Vec::new();
+        for _ in 0..count {
+            let name = read_string(&mut bytes)?;
+            let attributes = take(&mut bytes, 2)?;
+            let data_type = match attributes[0] {
+                0 => DataType::Integer,
+                1 => DataType::Text,
+                2 => DataType::Float,
+                3 => DataType::Boolean,
+                _ => return Err(DbError::CorruptData("invalid schema data type".into())),
+            };
+            let flags = attributes[1];
+            if flags & !3 != 0 {
+                return Err(DbError::CorruptData("invalid column flags".into()));
+            }
+            columns.push(Column::new(name, data_type, flags & 1 != 0, flags & 2 != 0));
+        }
+        if !bytes.is_empty() {
+            return Err(DbError::CorruptData("trailing schema bytes".into()));
+        }
+        Self::new(table_name, columns)
+            .map_err(|error| DbError::CorruptData(format!("invalid stored schema: {error}")))
+    }
+}
+
+fn write_string(bytes: &mut Vec<u8>, value: &str) -> Result<()> {
+    let length = u16::try_from(value.len())
+        .map_err(|_| DbError::InvalidSchema("schema name is too long".into()))?;
+    bytes.extend_from_slice(&length.to_le_bytes());
+    bytes.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn take<'a>(bytes: &mut &'a [u8], length: usize) -> Result<&'a [u8]> {
+    if length > bytes.len() {
+        return Err(DbError::CorruptData("schema ended unexpectedly".into()));
+    }
+    let (value, remaining) = bytes.split_at(length);
+    *bytes = remaining;
+    Ok(value)
+}
+
+fn read_u16(bytes: &mut &[u8]) -> Result<u16> {
+    let value = take(bytes, 2)?;
+    Ok(u16::from_le_bytes([value[0], value[1]]))
+}
+
+fn read_string(bytes: &mut &[u8]) -> Result<String> {
+    let length = usize::from(read_u16(bytes)?);
+    let value = take(bytes, length)?;
+    std::str::from_utf8(value)
+        .map(str::to_owned)
+        .map_err(|_| DbError::CorruptData("invalid UTF-8 in schema".into()))
 }

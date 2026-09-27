@@ -261,17 +261,15 @@ pub(crate) struct BPlusTree {
 impl BPlusTree {
     pub(crate) fn create(pool: &mut BufferPool, schema: &Schema) -> Result<Self> {
         let page = Node::empty().encode(schema)?;
-        let root_page_id = pool.allocate_page()?;
+        let root_page_id = pool.root_page_id();
         pool.write_page(root_page_id, &page)?;
         Ok(Self { root_page_id })
     }
 
-    pub(crate) fn open(root_page_id: PageId) -> Self {
-        Self { root_page_id }
-    }
-
-    pub(crate) fn root_page_id(&self) -> PageId {
-        self.root_page_id
+    pub(crate) fn open(pool: &mut BufferPool, schema: &Schema) -> Result<Self> {
+        let root_page_id = pool.root_page_id();
+        Self::read_node(pool, schema, root_page_id)?;
+        Ok(Self { root_page_id })
     }
 
     pub(crate) fn get(&self, pool: &mut BufferPool, schema: &Schema, value: &Value) -> Result<Option<Row>> {

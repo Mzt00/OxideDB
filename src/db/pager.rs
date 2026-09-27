@@ -4,35 +4,36 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use std::path::Path;
 use super::error::{DbError, Result};
+use super::schema::Schema;
 
 pub const PAGE_SIZE: usize = 4096;
 pub type PageId = u32;
 
 pub const INVALID_PAGE_ID: PageId = u32::MAX;
 const FILE_EXT: &[u8;8] = b"OXIDEDB\0";
-const FORMAT_VERSION: u32 = 1;//for future version
+const HEADER_SIZE: usize = 28;
 
-//formatting of page 0/header in bytes:
-//0-8: file type
-//8-12: formt version
-//12-16: page size
-//16-20: root page id
-//20-24:page count
-//remainig will be filled as 0
-//page 1 will be root
-#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+#[derive(Debug,Clone,PartialEq,Eq)]
 
 struct FileHeader{
     root_page_id: PageId,
     page_count: PageId,
+    schema: Vec<u8>,
 }
 
 impl FileHeader{
-    fn new()-> Self {
-        Self {
+    fn new(schema: &Schema)-> Result<Self> {
+        let schema = schema.encode()?;
+        if schema.len() > PAGE_SIZE - HEADER_SIZE {
+            return Err(DbError::InvalidSchema(format!(
+                "schema requires {} bytes, header holds {}", schema.len(), PAGE_SIZE - HEADER_SIZE
+            )));
+        }
+        Ok(Self {
             root_page_id: 1,
             page_count: 2,
-        }
+            schema,
+        })
     }
     fn encode(&self) -> [u8; PAGE_SIZE] {
         let mut page = [0u8; PAGE_SIZE];
@@ -41,6 +42,8 @@ impl FileHeader{
         page[12..16].copy_from_slice(&(PAGE_SIZE as u32).to_le_bytes(),);
         page[16..20].copy_from_slice(&self.root_page_id.to_le_bytes(),);
         page[20..24].copy_from_slice(&self.page_count.to_le_bytes(),);
+        page[24..28].copy_from_slice(&(self.schema.len() as u32).to_le_bytes());
+        page[HEADER_SIZE..HEADER_SIZE + self.schema.len()].copy_from_slice(&self.schema);
         return page
     }
     fn decode(page: &[u8; PAGE_SIZE]) -> Result<Self> {
@@ -60,7 +63,16 @@ impl FileHeader{
 
         let root_page_id = read_u32(page, 16);
         let page_count = read_u32(page, 20);
-        Ok(Self {root_page_id,page_count,})
+        let schema_length = read_u32(page, 24) as usize;
+        if schema_length == 0 || schema_length > PAGE_SIZE - HEADER_SIZE {
+            return Err(DbError::CorruptData("invalid schema length".into()));
+        }
+        let end = HEADER_SIZE + schema_length;
+        if page[end..].iter().any(|&byte| byte != 0) {
+            return Err(DbError::CorruptData("nonzero header padding".into()));
+        }
+        let schema = page[HEADER_SIZE..end].to_vec();
+        Ok(Self {root_page_id,page_count,schema})
     }
     
 }
@@ -71,9 +83,10 @@ pub struct Pager{
 }
 
 impl Pager{
-    pub fn create(path: &Path)->Result<Self>{
+    pub fn create(path: &Path, schema: &Schema)->Result<Self>{
+        let header = FileHeader::new(schema)?;
         let file = OpenOptions::new().read(true).write(true).create_new(true).open(path)?;
-        let header = FileHeader::new();
+        file.try_lock().map_err(std::io::Error::from)?;
         let mut pager = Self{
             file,
             header,
@@ -88,6 +101,7 @@ impl Pager{
 
     pub fn open(path:&Path)-> Result<Self>{
         let mut file = OpenOptions::new().read(true).write(true).open(path)?;
+        file.try_lock().map_err(std::io::Error::from)?;
         let file_length = file.metadata()?.len();
         if file_length < PAGE_SIZE as u64{
             return Err(DbError::PageError("Table file cannot contain a header".to_string()));
@@ -111,6 +125,9 @@ impl Pager{
 
     pub fn root_page_id(&self)->PageId{
         self.header.root_page_id
+    }
+    pub(crate) fn schema(&self) -> Result<Schema> {
+        Schema::decode(&self.header.schema)
     }
     pub fn set_root_page_id(&mut self, page_id: PageId,)->Result<()>{
         self.validate_data_page_id(page_id)?;

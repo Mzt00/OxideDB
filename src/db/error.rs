@@ -2,6 +2,8 @@ use std::fmt;
 #[derive(Debug)]
 pub enum DbError{
     Io(std::io::Error),
+    RecoveryRequired(String),
+    CommitUnknown(String),
     SyntaxError(String),
     TableNotFound(String),
     TableAlreadyExists(String),
@@ -30,6 +32,8 @@ pub type Result<T> = std::result::Result<T,DbError>;
 impl fmt::Display for DbError{
     fn fmt(&self, f: &mut fmt::Formatter<'_>)->fmt::Result{
         match self{
+            DbError::RecoveryRequired(reason) => write!(f, "reopen the table for recovery: {reason}"),
+            DbError::CommitUnknown(reason) => write!(f, "commit outcome is unknown; reopen the table: {reason}"),
             DbError::Io(error)=>{
                 write!(f, "I/O Error: {}",error)
             }

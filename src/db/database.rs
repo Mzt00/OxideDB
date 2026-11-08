@@ -4,8 +4,10 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use super::error::{DbError, Result};
+use super::row::Row;
 use super::schema::Schema;
 use super::table::Table;
+use super::value::Value;
 
 pub struct Database {
     directory: PathBuf,
@@ -53,7 +55,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn table(&mut self, name: &str) -> Result<&mut Table> {
+    fn table(&mut self, name: &str) -> Result<&mut Table> {
         if !self.tables.contains_key(name) {
             let path = self.table_path(name)?;
             let metadata =
@@ -72,6 +74,26 @@ impl Database {
             self.tables.insert(name.to_owned(), table);
         }
         Ok(self.tables.get_mut(name).expect("opened table must be cached"))
+    }
+
+    pub fn insert(&mut self, table: &str, row: Row) -> Result<()> {
+        self.table(table)?.insert(row)
+    }
+
+    pub fn get(&mut self, table: &str, key: &Value) -> Result<Option<Row>> {
+        self.table(table)?.get(key)
+    }
+
+    pub fn replace(&mut self, table: &str, key: &Value, row: Row) -> Result<bool> {
+        self.table(table)?.replace(key, row)
+    }
+
+    pub fn delete(&mut self, table: &str, key: &Value) -> Result<bool> {
+        self.table(table)?.delete(key)
+    }
+
+    pub fn scan(&mut self, table: &str) -> Result<Vec<Row>> {
+        self.table(table)?.scan()
     }
 
     pub fn table_names(&self) -> Result<Vec<String>> {

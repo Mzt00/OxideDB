@@ -54,19 +54,13 @@ impl FileHeader {
         }
         let version = read_u32(page, 8);
         if version != FORMAT_VERSION {
-            return Err(DbError::PageError(format!(
-                "Invalid table format version: {}",
-                version
-            )));
+            return Err(DbError::PageError(format!("Invalid table format version: {}",version)));
         }
 
         let stored_page_size = read_u32(page, 12);
 
         if stored_page_size != PAGE_SIZE as u32 {
-            return Err(DbError::PageError(format!(
-                "Invalid page size: expected {}, got {}",
-                PAGE_SIZE, stored_page_size
-            )));
+            return Err(DbError::PageError(format!("Invalid page size: expected {}, got {}",PAGE_SIZE, stored_page_size)));
         }
 
         let root_page_id = read_u32(page, 16);
@@ -80,11 +74,7 @@ impl FileHeader {
             return Err(DbError::CorruptData("nonzero header padding".into()));
         }
         let schema = page[HEADER_SIZE..end].to_vec();
-        Ok(Self {
-            root_page_id,
-            page_count,
-            schema,
-        })
+        Ok(Self {root_page_id,page_count,schema,})
     }
 }
 
@@ -101,6 +91,12 @@ pub struct Pager {
 }
 
 impl Pager {
+    pub fn create(path: &Path, schema: &Schema) -> Result<Self> {
+        let mut pager = Self::create_unpublished(path, schema)?;
+        pager.publish()?;
+        Ok(pager)
+    }
+
     pub(crate) fn create_unpublished(path: &Path, schema: &Schema) -> Result<Self> {
         let header = FileHeader::new(schema)?;
         let path = files::absolute(path)?;
@@ -245,6 +241,13 @@ impl Pager {
 
     pub(crate) fn schema(&self) -> Result<Schema> {
         Schema::decode(&self.header.schema)
+    }
+
+    pub fn set_root_page_id(&mut self, page_id: PageId) -> Result<()> {
+        self.validate_data_page_id(page_id)?;
+        self.start_write()?;
+        self.header.root_page_id = page_id;
+        Ok(())
     }
 
     pub fn page_count(&self) -> PageId {

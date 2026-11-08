@@ -1,8 +1,8 @@
 # OxideDB
 
-[![Crates.io](https://badgen.net/crates/v/oxidedb)](https://crates.io/crates/oxidedb)
+[![Crates.io](https://img.shields.io/crates/v/oxidedb.svg)](https://crates.io/crates/oxidedb)
 [![Docs.rs](https://docs.rs/oxidedb/badge.svg)](https://docs.rs/oxidedb)
-[![License](https://badgen.net/crates/l/oxidedb)](#7-license)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#7-license)
 
 A small embedded database written in pure Rust, with B+ tree storage and crash-safe rollback journaling.
 

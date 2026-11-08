@@ -1,10 +1,16 @@
 [package]
-name = "OxideDB"
+name = "oxidedb"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.89"
+description = "A small embedded database with B-tree storage and crash-safe rollback journaling"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Mzt00/OxideDB"
+readme = "README.md"
+keywords = ["database", "embedded", "btree", "storage"]
+categories = ["database-implementations"]
+exclude = ["*.db", "*.db-journal"]
 
 [dependencies]
 atomicwrites = "0.4.4"
 nom = "8.0.0"
-serde = { version = "1.0.229", features = ["derive"] }

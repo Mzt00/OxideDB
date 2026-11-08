@@ -91,12 +91,6 @@ pub struct Pager {
 }
 
 impl Pager {
-    pub fn create(path: &Path, schema: &Schema) -> Result<Self> {
-        let mut pager = Self::create_unpublished(path, schema)?;
-        pager.publish()?;
-        Ok(pager)
-    }
-
     pub(crate) fn create_unpublished(path: &Path, schema: &Schema) -> Result<Self> {
         let header = FileHeader::new(schema)?;
         let path = files::absolute(path)?;
@@ -241,13 +235,6 @@ impl Pager {
 
     pub(crate) fn schema(&self) -> Result<Schema> {
         Schema::decode(&self.header.schema)
-    }
-
-    pub fn set_root_page_id(&mut self, page_id: PageId) -> Result<()> {
-        self.validate_data_page_id(page_id)?;
-        self.start_write()?;
-        self.header.root_page_id = page_id;
-        Ok(())
     }
 
     pub fn page_count(&self) -> PageId {

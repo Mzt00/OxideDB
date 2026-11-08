@@ -3,7 +3,7 @@ use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use OxideDB::{Column, DataType, Database, DbError, Row, Schema, Value};
+use oxidedb::{Column, DataType, Database, DbError, Row, Schema, Value};
 
 const PAGE_SIZE: usize = 4096;
 

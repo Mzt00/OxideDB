@@ -16,10 +16,10 @@ pub struct Table {
 
 impl Table {
     pub fn create(path: &Path, schema: Schema) -> Result<Self> {
-        let pager = Pager::create(path, &schema)?;
+        let pager = Pager::create_unpublished(path, &schema)?;
         let mut pool = BufferPool::new(pager, DEFAULT_CAPACITY)?;
         let tree = BPlusTree::create(&mut pool, &schema)?;
-        pool.sync()?;
+        pool.publish()?;
         Ok(Self { schema, pool, tree })
     }
 
@@ -36,8 +36,14 @@ impl Table {
     }
 
     pub fn insert(&mut self, row: Row) -> Result<()> {
-        self.tree.insert(&mut self.pool, &self.schema, row)?;
-        self.pool.sync()
+        self.pool.begin()?;
+        match self.tree.insert(&mut self.pool, &self.schema, row) {
+            Ok(()) => self.pool.sync(),
+            Err(error) => {
+                self.pool.rollback()?;
+                Err(error)
+            }
+        }
     }
 
     pub fn get(&mut self, key: &Value) -> Result<Option<Row>> {
@@ -49,18 +55,30 @@ impl Table {
     }
 
     pub fn replace(&mut self, key: &Value, row: Row) -> Result<bool> {
-        let replaced = self.tree.replace(&mut self.pool, &self.schema, key, row)?;
-        if replaced {
-            self.pool.sync()?;
+        self.pool.begin()?;
+        match self.tree.replace(&mut self.pool, &self.schema, key, row) {
+            Ok(replaced) => {
+                self.pool.sync()?;
+                Ok(replaced)
+            }
+            Err(error) => {
+                self.pool.rollback()?;
+                Err(error)
+            }
         }
-        Ok(replaced)
     }
 
     pub fn delete(&mut self, key: &Value) -> Result<bool> {
-        let deleted = self.tree.delete(&mut self.pool, &self.schema, key)?;
-        if deleted {
-            self.pool.sync()?;
+        self.pool.begin()?;
+        match self.tree.delete(&mut self.pool, &self.schema, key) {
+            Ok(deleted) => {
+                self.pool.sync()?;
+                Ok(deleted)
+            }
+            Err(error) => {
+                self.pool.rollback()?;
+                Err(error)
+            }
         }
-        Ok(deleted)
     }
 }

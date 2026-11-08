@@ -253,7 +253,6 @@ impl Node {
     }
 }
 
-/// The root page ID stays fixed as the tree grows. Persist changes with pool.sync().
 pub(crate) struct BPlusTree {
     root_page_id: PageId,
 }
@@ -334,7 +333,6 @@ impl BPlusTree {
         let key = Self::key(schema, value)?;
         let (page_id, mut node) = self.find_leaf(pool, schema, Some(&key), &mut Vec::new())?;
         let Ok(index) = node.search_rows(schema, &key)? else { return Ok(false); };
-        // ponytail: retain sparse pages and separator bounds; add merging when page reuse is needed.
         node.rows.remove(index);
         pool.write_page(page_id, &node.encode(schema)?)?;
         Ok(true)

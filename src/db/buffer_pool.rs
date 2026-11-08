@@ -86,12 +86,6 @@ impl BufferPool {
         self.pager.root_page_id()
     }
 
-    pub fn set_root_page_id(&mut self, page_id: PageId) -> Result<()> {
-        self.pager.validate_data_page_id(page_id)?;
-        self.flush()?;
-        self.pager.set_root_page_id(page_id)
-    }
-
     pub fn flush(&mut self) -> Result<()> {
         self.pager.check_healthy()?;
         for (&page_id, page) in &mut self.pages {

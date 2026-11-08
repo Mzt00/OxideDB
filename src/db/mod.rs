@@ -1,9 +1,15 @@
-pub mod error;
-pub mod schema;
-pub mod value;
-pub mod row;
-pub mod pager;
-pub mod buffer_pool;
-pub(crate) mod b_tree;
-pub mod table;
-pub mod database;
+mod b_tree;
+mod buffer_pool;
+mod database;
+pub(crate) mod error;
+pub(crate) mod pager;
+mod row;
+mod schema;
+mod table;
+mod value;
+
+pub use database::Database;
+pub use error::{DbError, Result};
+pub use row::Row;
+pub use schema::{Column, Schema};
+pub use value::{DataType, Value};

@@ -11,7 +11,6 @@ struct CachedPage {
     last_used: u64,
 }
 
-// Call flush or sync before dropping the pool to save dirty pages.
 pub struct BufferPool {
     pager: Pager,
     pages: HashMap<PageId, CachedPage>,
@@ -20,7 +19,6 @@ pub struct BufferPool {
 }
 
 impl BufferPool {
-    //Capacity is the maximum number of cached data pages.
     pub fn new(pager: Pager, capacity: usize) -> Result<Self> {
         if capacity == 0 {
             return Err(DbError::PageError(
@@ -37,6 +35,7 @@ impl BufferPool {
     }
 
     pub fn read_page(&mut self, page_id: PageId) -> Result<[u8; PAGE_SIZE]> {
+        self.pager.check_healthy()?;
         self.clock = self.clock.wrapping_add(1);
         if let Some(page) = self.pages.get_mut(&page_id) {
             page.last_used = self.clock;
@@ -56,9 +55,9 @@ impl BufferPool {
         Ok(bytes)
     }
 
-    // Buffers a full page the file is updated on eviction or flush.
     pub fn write_page(&mut self, page_id: PageId, bytes: &[u8; PAGE_SIZE]) -> Result<()> {
         self.pager.validate_data_page_id(page_id)?;
+        self.pager.start_write()?;
         if !self.pages.contains_key(&page_id) {
             self.make_room()?;
         }
@@ -94,6 +93,7 @@ impl BufferPool {
     }
 
     pub fn flush(&mut self) -> Result<()> {
+        self.pager.check_healthy()?;
         for (&page_id, page) in &mut self.pages {
             if page.dirty {
                 self.pager.write_page(page_id, &page.bytes)?;
@@ -105,7 +105,25 @@ impl BufferPool {
 
     pub fn sync(&mut self) -> Result<()> {
         self.flush()?;
-        self.pager.sync()
+        let result = self.pager.sync();
+        if result.is_err() {
+            self.pages.clear();
+        }
+        return result
+    }
+
+    pub fn begin(&mut self) -> Result<()> {
+        self.pager.begin()
+    }
+
+    pub fn rollback(&mut self) -> Result<()> {
+        self.pages.clear();
+        self.pager.rollback()
+    }
+
+    pub(crate) fn publish(&mut self) -> Result<()> {
+        self.flush()?;
+        self.pager.publish()
     }
 
     fn make_room(&mut self) -> Result<()> {
